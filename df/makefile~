@@ -1,0 +1,116 @@
+
+# Makefile for df
+
+#------------------------------------------------------
+HOST=$(shell hostname)
+ifneq (,$(findstring .ast.cam.ac.uk,$(HOST)))
+	CCOMPILER = /opt/ioa/software/gcc/4.7.2/bin/g++
+	DEBUG = -g -pg -ggdb3 #-ffast-math -Ofast
+	OPTS = -std=c++0x -Wall -O2 -fopenmp -fPIC $(DEBUG)
+	GSLPATH = /opt/ioa/software/gsl/1.16/
+	BOOSTINCPATH =/opt/ioa/software/boost/1.55.0/include
+	BOOSTLIBPATH =-L/opt/ioa/software/boost/1.55.0/lib
+	PYTHONINCPATH=/opt/ioa/software/python/2.7.8/include/python2.7/
+	PYTHONLIBPATH=-L/opt/ioa/software/python/2.7.8/lib/
+else
+	CCOMPILER = g++-4.9
+	OPTS = -std=c++0x -Wall -O3 -Ofast -ffast-math -fopenmp -fPIC
+	BOOSTINCPATH =.
+	BOOSTLIBPATH =
+	PYTHONINCPATH=/Users/jls/anaconda/include/python2.7/
+	PYTHONLIBPATH=-L/Users/jls/anaconda/lib/
+	EXTRACLIB = -lc++
+endif
+
+#------------------------------------------------------
+# General compiler & options
+SRC = src/
+POT = pot/
+OBJ = obj/
+POTSRC = ../pot/src/
+POTOBJ = ../pot/obj/
+AASRC = ../aa/src/
+AAOBJ = ../aa/obj/
+FALCONOBJ=$(OBJ)falcONobj/
+#------------------------------------------------------
+# Set paths to other code
+
+GENERALPATH = ../general/
+CTPATH = ../general/coordtransforms/
+TORUSPATH = ../Torus/
+NEMOPATH = /data/jls/nemo/
+FALCONPATH = $(NEMOPATH)usr/dehnen/falcON.P/
+AAPATH = ../aa/
+POTPATH = ../pot/
+
+GNUPLOTLIBPATH = $(GENERALPATH)gnuplot
+NUMRECLIBPATH = $(GENERALPATH)jamestools/numrec/
+JAMESLIBPATH = $(GENERALPATH)jamestools/jamestools/
+
+TORUSINCPATH = -I$(TORUSPATH)src/ -I$(TORUSPATH)WDlib/inc/
+TORUSLIBPATH = -L$(TORUSPATH)obj/ -L$(TORUSPATH)WDlib/obj/
+AAINCPATH = $(AAPATH)inc/
+AALIBPATH = $(AAPATH)lib/
+COORDINCPATH = $(CTPATH)inc/
+COORDLIBPATH = $(CTPATH)
+POTINCPATH = $(POTPATH)inc/
+POTLIBPATH = $(POTPATH)
+
+LAPACKPATH = $(GENERALPATH)lapack/
+CUBALIBPATH = -L$(GENERALPATH)cuba -L$(GENERALPATH)cubature
+CUBA = $(CUBALIBPATH) -lcuba -lcubature_sj
+
+#------------------------------------------------------
+# Set include and library paths
+
+INC = -I../../ -Iinc/ $(TORUSINCPATH) -I$(PYTHONINCPATH) -I$(BOOSTINCPATH) -I$(GENERALPATH) -I$(GSLPATH)include/ -I$(AAINCPATH) -I$(COORDINCPATH) -I$(POTINCPATH)
+
+LIB = -L$(GENERALPATH) -L$(NUMRECLIBPATH) -L$(JAMESLIBPATH) \
+	  -L$(GNUPLOTLIBPATH) $(TORUSLIBPATH) -L$(GSLPATH)lib/ \
+	  -L$(AALIBPATH) -L$(COORDLIBPATH) -L$(POTLIBPATH) \
+	  -laa -lpot_js -lcoords \
+	  -lpress_cp -lTorus -lOther -lPot -lWD -lplot -lgsl -lgslcblas \
+	  -lm $(EXTRACLIB) -L$(LAPACKPATH) -llapack -lblas -ljamestools
+BOOSTLIB = -lboost_python -lpython2.7
+LIBPY = $(PYTHONLIBPATH) $(BOOSTLIBPATH) $(BOOSTLIB)
+
+#------------------------------------------------------
+# Set files
+
+TESTS = test_df.exe
+
+SELFCON = build_self_consistent.exe build_multi_self_consistent.exe
+
+OBJECTS = $(OBJ)df.o $(OBJ)moments.o $(OBJ)self_consistent.o
+
+HEADERS = $(wildcard inc/*.h)
+
+#------------------------------------------------------
+
+default: clean all
+
+all:  $(SELFCON)
+
+forceall: clean all
+
+#------------------------------------------------------
+
+$(OBJ)%.o : $(SRC)%.cpp ${HEADERS}
+	$(CCOMPILER) $(OPTS) -c $< -o $@ $(INC)
+
+#------------------------------------------------------
+
+## SELF CONSISTENT
+
+build_self_consistent.exe: $(OBJECTS) $(OBJ)build_self_consistent.o
+	$(CCOMPILER) $(OPTS) -o build_self_consistent.exe $(OBJECTS) $(OBJ)build_self_consistent.o $(LIB) $(CUBA)
+
+build_multi_self_consistent.exe: $(OBJECTS) $(OBJ)multicomponent_self_consistent.o
+	$(CCOMPILER) $(OPTS) -o build_multi_self_consistent.exe $(OBJECTS) $(OBJ)multicomponent_self_consistent.o $(LIB) $(CUBA)
+
+veldisp_self_consistent.exe: $(OBJECTS) $(OBJ)veldisp_self_consistent.o
+	$(CCOMPILER) $(OPTS) -o veldisp_self_consistent.exe $(OBJECTS) $(OBJ)veldisp_self_consistent.o $(LIB) $(LIBPY) $(CUBA)
+
+.PHONY: clean
+clean:
+	rm -rf obj/*.o; rm -rf *.so; rm -rf *.exe
